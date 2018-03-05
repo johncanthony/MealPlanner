@@ -91,21 +91,19 @@ def do_set(client,key,value):
     return status, 200
 
 
-#Default scan endpoint using the default 0 cursor and a count of 10 objects
-@app.route('/api/v1/dishes/scan/',methods=['GET'])
-def scan_root():
-    cursor = 0
-    count = 10
-    client = get_redis_client()
-    data, resp_code = do_scan(client,cursor,count)
-
-    return json.dumps(data), resp_code
-
-
 #Scan endpoint that takes a cursor and count, then delivers the key space within
 #the count and cursor
-@app.route('/api/v1/dishes/scan/<string:cursor>/<int:count>',methods=['GET'])
-def scan(cursor='0',count=10):
+@app.route('/api/v1/dishes/',methods=['GET'])
+def scan():
+    cursor=str(request.args.get('cursor'))
+    count=request.args.get('count')
+
+    if cursor == 'None':
+        cursor = '0'
+
+    if count == None:
+        count = 10
+
     client = get_redis_client()
     data, resp_code = do_scan(client,cursor,count)
 
@@ -113,8 +111,14 @@ def scan(cursor='0',count=10):
 
 
 #Action get value of a given key
-@app.route('/api/v1/dishes/dish/<string:dish>',methods=['GET'])
-def get_dish(dish):
+@app.route('/api/v1/dishes/dish/',methods=['GET'])
+def get_dish():
+    dish = request.args.get('dish')
+
+    if dish == None:
+        data = {'status':'Fail','error':'No dish provided'}
+        return json.dumps(data), 400
+
     client = get_redis_client()
     data, resp_code  = do_get(client,dish)
 
