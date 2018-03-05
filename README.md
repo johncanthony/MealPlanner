@@ -2,9 +2,14 @@
 
 
 ## Endpoints
+[http://www.example.com/api/v1/dishes/](#/api/v1/dishes/)
 
-### GET /api/v1/dishes/
+[http://www.example.com/api/v1/dishes/dish/](#/api/v1/dishes/dish)
+### /api/v1/dishes/
 Description: Pulls a list of first 10 dishes
+
+Methods:
+* GET
 
 Parameters: 
     
@@ -30,7 +35,9 @@ Returns:
     }
     ```
 
-### GET /api/v1/dishes/dish
+### /api/v1/dishes/dish
+Method: GET
+
 Description: Pulls the ingredients for a single dish
 
 Parameters:
@@ -61,3 +68,4 @@ Error:
    * Dish parameter not provided
 
 
+Method: Post
