@@ -1,19 +1,20 @@
-#MealPlanner API V1
+# MealPlanner API V1
 
 
-##Endpoints
+## Endpoints
 
-###GET /api/v1/dishes/
+### GET /api/v1/dishes/
 Description: Pulls a list of first 10 dishes
 
 Parameters: 
+    
     * (Optional) cursor : <integer> 
-    ** Moves the cursor to pull a set of dishes starting from the cursor point
-    ** Example : /api/v1/dishes/?cursor=5
+     * Moves the cursor to pull a set of dishes starting from the cursor point
+     * Example : /api/v1/dishes/?cursor=5
 
     * (Optional) count : <integer>
-    ** Changes the total number of dishes pulled by the query. Note: depending on current cursor location, the returned list may be shorter than the count provided
-    ** Example : /api/v1/dishes/?count=25
+     * Changes the total number of dishes pulled by the query. Note: depending on current cursor location, the returned list may be shorter than the count provided
+     * Example : /api/v1/dishes/?count=25
 
 Returns:
 
@@ -27,12 +28,13 @@ Returns:
     }
     ```
 
-###GET /api/v1/dishes/dish
+### GET /api/v1/dishes/dish
 Description: Pulls the ingredients for a single dish
 
 Parameters:
+
     * dish : naked string with %20 in spaces
-    ** Specifies the dish being queried
+     * Specifies the dish being queried
 
 Returns:
 
