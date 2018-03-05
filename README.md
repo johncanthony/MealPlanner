@@ -8,8 +8,7 @@
 ### /api/v1/dishes/
 Description: Pulls a list of first 10 dishes
 
-Methods:
-* GET
+#### Method: GET
 
 Parameters: 
     
@@ -36,7 +35,8 @@ Returns:
     ```
 
 ### /api/v1/dishes/dish
-Method: GET
+
+#### Method: GET
 
 Description: Pulls the ingredients for a single dish
 
@@ -67,5 +67,6 @@ Error:
     Response Code: 400  
    * Dish parameter not provided
 
+#### Method: Post
 
-Method: Post
+#### TODO
