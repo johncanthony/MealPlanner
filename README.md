@@ -5,6 +5,9 @@
 [http://www.example.com/api/v1/dishes/](#/api/v1/dishes/)
 
 [http://www.example.com/api/v1/dishes/dish/](#/api/v1/dishes/dish)
+
+[http://www.example.com/api/v1/dishes/search](#/api/v1/dishes/search)
+
 ### /api/v1/dishes/
 Description: Pulls a list of first 10 dishes
 
@@ -70,3 +73,31 @@ Error:
 #### Method: Post
 
 #### TODO
+
+### /api/v1/dishes/search
+
+#### Method : GET
+
+Description: Query all dishes given a partial string or keyword
+
+Parameters:
+
+* query 
+  * Type: naked string with %20 in spaces
+  * Partial string or keyword for dishes
+  * Example: /api/v1/dishes/search/?query=Hot%20Dogs
+
+Returns:
+
+    JSON 
+    
+    ```
+    {
+     status: string - success/fail
+     //status: success
+     data: [] - array of ingredients
+
+    //status: fail
+    error: string - error message     
+    }
+    ```
