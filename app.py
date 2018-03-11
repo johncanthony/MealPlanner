@@ -3,6 +3,7 @@ import json
 from flask import Flask , request
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
+import ast
 
 app = Flask(__name__)
 
@@ -18,7 +19,7 @@ schema= {
 
 #Method for obtaining redis client
 def get_redis_client():
-    HOSTNAME = "redis.home" 
+    HOSTNAME = "192.168.1.76" 
     PORT = 6379
     DB = 1
 
@@ -56,7 +57,10 @@ def do_scan(client, cursor, count):
 def do_get(client,key):
     status = {}
 
-    data = client.get(key)
+    #Literal eval here provides an actual list object representation 
+    #resolves a bug in type when accessing API where this entry resolves 
+    #to type string
+    data = ast.literal_eval(client.get(key))
 
     if data == None:
         status['status']='Fail'
@@ -96,6 +100,7 @@ def do_search(client,search_key):
     count = 200
     search = "*{}*".format(str(search_key))
 
+    print("Searching...")
     cursor, data = client.scan(match=search,count = count)
 
     status['status'] = 'success'
@@ -171,6 +176,7 @@ def search():
 
     client = get_redis_client()
 
+    print("In search web handler")
     data, resp_code = do_search(client,search)
 
     return json.dumps(data), resp_code
@@ -178,8 +184,4 @@ def search():
 
 if __name__=="__main__":
     app.run(host='0.0.0.0',debug=True)
-def uniq(redis,dish):
-    if redis.get(dish) ==  None:
-        return True
 
-    return False
