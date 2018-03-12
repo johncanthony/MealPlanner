@@ -3,6 +3,7 @@ import json
 from flask import Flask , request
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
+import ast
 
 app = Flask(__name__)
 
@@ -18,7 +19,7 @@ schema= {
 
 #Method for obtaining redis client
 def get_redis_client():
-    HOSTNAME = "redis.home" 
+    HOSTNAME = [Hostname] 
     PORT = 6379
     DB = 1
 
@@ -31,9 +32,7 @@ def uniq(client,dish):
     return False
 
 
-#do_scan(client : StrictRedis, cursor: string, count: int)
-# Takes the given client and performs a scan against the redis instance
-# then forms the response object
+#Scan redis using the provided cursor and count
 def do_scan(client, cursor, count):
     status = {}
 
@@ -58,7 +57,10 @@ def do_scan(client, cursor, count):
 def do_get(client,key):
     status = {}
 
-    data = client.get(key)
+    #Literal eval here provides an actual list object representation 
+    #resolves a bug in type when accessing API where this entry resolves 
+    #to type string
+    data = ast.literal_eval(client.get(key))
 
     if data == None:
         status['status']='Fail'
@@ -71,8 +73,10 @@ def do_get(client,key):
 
     return status, 200
 
+#sets value in client
 def do_set(client,key,value):
     status = {}
+
     
     #Check Unique
     if not uniq(client,key):
@@ -87,6 +91,20 @@ def do_set(client,key,value):
     status['ingredients']=value
 
     #update status and return
+
+    return status, 200
+
+#search the redis space for a given set of keywords
+def do_search(client,search_key):
+    status = {}
+    count = 200
+    search = "*{}*".format(str(search_key))
+
+    print("Searching...")
+    cursor, data = client.scan(match=search,count = count)
+
+    status['status'] = 'success'
+    status['dishes'] = data
 
     return status, 200
 
@@ -147,11 +165,23 @@ def set_dish():
 
 
 #TODO - GET a partial scan of Keyspace given a search partial match of the key
+@app.route('/api/v1/dishes/search',methods=['GET'])
+def search():
+
+    search = request.args.get('query')
+
+    if search == None:
+        data = {'status':'fail','error':'No search parameter provided'}
+        return json.dumps(data), 412
+
+    client = get_redis_client()
+
+    print("In search web handler")
+    data, resp_code = do_search(client,search)
+
+    return json.dumps(data), resp_code
+
 
 if __name__=="__main__":
-    app.run(host='0.0.0.0',debug=True)
-def uniq(redis,dish):
-    if redis.get(dish) ==  None:
-        return True
+    app.run(host='0.0.0.0')
 
-    return False
