@@ -15,7 +15,8 @@ class TestLoad(unittest.TestCase):
         self.redis = fakeredis.FakeStrictRedis()
 
         for point in data:
-            self.redis.set(point,data[point])
+	    for each in point:
+             self.redis.lpush(point,each)
 
     def tearDown(self):
         self.redis.flushall()

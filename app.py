@@ -26,7 +26,7 @@ def get_redis_client():
     return redis.StrictRedis(host=HOSTNAME, port = PORT, db = DB)
 
 def uniq(client,dish):
-    if client.get(dish) == None:
+    if len(client.lrange(dish,0,-1) == 0):
         return True
 
     return False
@@ -57,10 +57,7 @@ def do_scan(client, cursor, count):
 def do_get(client,key):
     status = {}
 
-    #Literal eval here provides an actual list object representation 
-    #resolves a bug in type when accessing API where this entry resolves 
-    #to type string
-    data = ast.literal_eval(client.get(key))
+    data = client.lrange(key,0,-1)
 
     if data == None:
         status['status']='Fail'
@@ -84,13 +81,13 @@ def do_set(client,key,value):
         status['error'] = 'Dish already exists'
         return status, 422
 
-    client.set(key,value)
+    for ingredient in value:
+	client.lpush(str(key),str(ingredient))    
 
     status['status']='Success'
     status['dish']=key
     status['ingredients']=value
 
-    #update status and return
 
     return status, 200
 
@@ -156,6 +153,10 @@ def set_dish():
     except ValidationError:
         status={'status':'Fail','error':'Invalid Json Format'}
         return json.dumps(status), 400
+
+    if(len(request.get_json()['ingredients'])==0):
+	status={'status':'Fail','error':'No Ingredients provided for dish'}
+	return json.dumps(status),400
 
     data = request.get_json()
 
