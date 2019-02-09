@@ -4,12 +4,24 @@ from flask import Flask , request
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 import ast
+import pickle
+import os.path
+import collections
+from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+import sys
+from time import strftime, gmtime
+
+log_file = "app/log/app-{}.log".format(strftime("%b-%d-%Y-%H-%M-%S", gmtime()))
+cred_file = "app/cred/token.pickle"
+sys.stdout = sys.stderr = open(log_file,'wt')
 
 app = Flask(__name__)
 
 #Schema for validation 
 
-schema= {
+dish_schema= {
          "type" : "object",
          "properties" : {
                "dish" : {"type": "string"},
@@ -17,16 +29,28 @@ schema= {
              },
         }
 
+date_schema = {
+	"type" : "object",
+	"properties" : {
+	      "dish" : {"type": "string"},
+	      "date" : {"type": "string"} 
+
+	     },
+	
+	}
+
+TimeTuple = collections.namedtuple("TimedTuple", "start end")
+
 #Method for obtaining redis client
 def get_redis_client():
-    HOSTNAME = [Hostname] 
+    HOSTNAME = "192.168.1.76" 
     PORT = 6379
     DB = 1
 
     return redis.StrictRedis(host=HOSTNAME, port = PORT, db = DB)
 
 def uniq(client,dish):
-    if client.get(dish) == None:
+    if len(client.lrange(dish,0,-1)) == 0:
         return True
 
     return False
@@ -57,10 +81,7 @@ def do_scan(client, cursor, count):
 def do_get(client,key):
     status = {}
 
-    #Literal eval here provides an actual list object representation 
-    #resolves a bug in type when accessing API where this entry resolves 
-    #to type string
-    data = ast.literal_eval(client.get(key))
+    data = client.lrange(key,0,-1)
 
     if data == None:
         status['status']='Fail'
@@ -74,25 +95,27 @@ def do_get(client,key):
     return status, 200
 
 #sets value in client
-def do_set(client,key,value):
+#does a method check (POST = UPDATE, PUT = NEW)
+def do_set(method,client,key,value):
     status = {}
 
     
     #Check Unique
-    if not uniq(client,key):
+    if (method == 'POST') and (not uniq(client,key)):
         status['status'] = 'Fail'
         status['error'] = 'Dish already exists'
         return status, 422
 
-    client.set(key,value)
+    for ingredient in value:
+	client.lpush(str(key),str(ingredient))    
 
     status['status']='Success'
     status['dish']=key
     status['ingredients']=value
 
-    #update status and return
 
     return status, 200
+
 
 #search the redis space for a given set of keywords
 def do_search(client,search_key):
@@ -108,7 +131,86 @@ def do_search(client,search_key):
 
     return status, 200
 
+#delete all values from key contained in the value parameter. If the key is empty delete
+def do_del(client,key,value):
+    status = {}
 
+    for each in value:
+	print(key)
+	client.lrem(str(key),1,str(each))
+
+    
+    if len(client.lrange(str(key),0,-1)) == 0:
+	client.delete(str(key))
+   	status['removed'] = true
+
+    status['status'] = 'Success'
+    status['ingredients'] = value;	
+    
+    return status, 200
+
+
+def get_Calendar_Creds():
+    creds = None
+    
+    # The file token.pickle stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
+    if os.path.exists(cred_file):
+        with open(cred_file, 'rb') as token:
+            creds = pickle.load(token)
+    # If there are no (valid) credentials available, let the user log in.
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'credentials.json', SCOPES)
+            creds = flow.run_local_server()
+        # Save the credentials for the next run
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
+
+    service = build('calendar', 'v3', credentials=creds)
+
+    return service
+
+#Set event in Calendar
+#Event Details { date, summaru, description)
+def do_create_calendar_event(date, summary, item_list):
+
+    service = get_Calendar_Creds()
+    timestamps = start_stop_time(date)
+    calendarID = "d665pq4cgkp0hi55imkonoq344@group.calendar.google.com"
+    event = {}
+ 
+    #date format MM/DD/YYYY HH:MM [PM/AM]
+ 
+    event['summary'] = summary
+    event['description'] = ",".join(item_list)
+    event['start'] = { 'dateTime': timestamps.start }
+    event['end'] = { 'dateTime': timestamps.end }
+
+    event = service.events().insert(calendarId=calendarID, body=event).execute()    
+
+    return event, 200
+
+def start_stop_time(datetime):
+
+ 	#print(datetime.split(" "))	
+	date,time,tod = datetime.split(" ")
+	mo,d,y = date.split("/")
+	#print(time.split(":"))
+	h,m = time.split(":")
+
+        if(tod == "PM"):
+		h = str(int(h) + 12)	
+
+	one_hour_plus = str(int(h) + 1)
+
+	return TimeTuple(start="{}-{}-{}T{}:{}:00-07:00".format(y,mo,d,h,m), end="{}-{}-{}T{}:{}:00-07:00".format(y,mo,d,one_hour_plus,m))
+
+	
 #Scan endpoint that takes a cursor and count, then delivers the key space within
 #the count and cursor
 @app.route('/api/v1/dishes/',methods=['GET'])
@@ -129,7 +231,7 @@ def scan():
 
 
 #Action get value of a given key
-@app.route('/api/v1/dishes/dish/',methods=['GET'])
+@app.route('/api/v1/dishes/dish',methods=['GET'])
 def get_dish():
     dish = request.args.get('dish')
 
@@ -143,8 +245,8 @@ def get_dish():
     return json.dumps(data), resp_code
 
 #Set value on a given key
-@app.route('/api/v1/dishes/dish',methods=['POST'])
-def set_dish():
+@app.route('/api/v1/dishes/dish',methods=['POST','PUT','DELETE'])
+def modify_dish():
     client = get_redis_client()
 
     if not request.is_json:
@@ -152,14 +254,21 @@ def set_dish():
         return json.dumps(status), 400
 
     try:
-        validate(request.get_json(),schema)
+        validate(request.get_json(),dish_schema)
     except ValidationError:
         status={'status':'Fail','error':'Invalid Json Format'}
         return json.dumps(status), 400
 
+    if(len(request.get_json()['ingredients'])==0):
+	status={'status':'Fail','error':'No Ingredients provided for dish'}
+	return json.dumps(status),400
+
     data = request.get_json()
 
-    data, resp_code = do_set(client,data['dish'],data['ingredients'])
+    if request.method == 'DELETE':
+    	data, resp_code = do_del(client,data['dish'],data['ingredients'])
+    else:
+    	data, resp_code = do_set(request.method,client,data['dish'],data['ingredients'])
 
     return json.dumps(data), resp_code
 
@@ -181,7 +290,31 @@ def search():
 
     return json.dumps(data), resp_code
 
+@app.route('/api/v1/dishes/date',methods=['PUT'])
+def date_add():
+   
+    client = get_redis_client()
+
+    if not request.is_json:
+        status={'status':'Fail','error':'No json provided'}
+        return json.dumps(status), 400
+
+    try:
+	validate(request.get_json(),date_schema)
+    except ValidationError:
+	print(request.get_json())
+        status={'status':'Fail','error':'Invalid Json Format'}
+        return json.dumps(status), 400	    
+
+
+    data = request.get_json()
+
+    items, st_code = do_get(client,data['dish'])
+ 
+    status, resp_code  = do_create_calendar_event(data['date'],data['dish'],items['data'])   
+
+    return json.dumps(status), resp_code
 
 if __name__=="__main__":
-    app.run(host='0.0.0.0')
+    app.run(host='0.0.0.0',debug=True)
 

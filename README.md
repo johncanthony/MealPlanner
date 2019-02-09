@@ -8,6 +8,10 @@
 
 [http://www.example.com/api/v1/dishes/search](#/api/v1/dishes/search)
 
+[http://www.example.com/api/v1/dishes/date](#/api/vi/dishes/date)
+
+
+
 ### /api/v1/dishes/
 Description: Pulls a list of first 10 dishes
 
@@ -70,9 +74,36 @@ Error:
     Response Code: 400  
    * Dish parameter not provided
 
-#### Method: Post
+#### Method: POST
 
-#### TODO
+Description: Creates a new dish
+
+Headers: 'Content-Type':'application/json'
+
+Parameters: 
+
+   JSON
+   ```
+    {
+       dish : String,
+       ingredients: Array,
+    }
+    ```
+
+Returns:
+
+   JSON
+   ```
+    {
+     status: string - success/fail
+     //status: success
+     data: [] - array of ingredients
+     key : string - name of the dish
+
+     //status: fail
+     error: string - error message     
+    }
+   ```
 
 ### /api/v1/dishes/search
 
@@ -101,3 +132,9 @@ Returns:
     error: string - error message     
     }
     ```
+
+### /api/v1/dishes/date
+
+#### Method: PUT
+
+
